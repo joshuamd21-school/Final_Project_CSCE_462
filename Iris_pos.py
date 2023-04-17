@@ -10,7 +10,7 @@ class eye_tracking():
     def __init__(self):
         self.camera = cv.VideoCapture(0)  # setting up of camera
 
-        self.face_mesh = mp_face_mesh.FaceMesh(
+        self.face_mesh = mp.solutions.face_mesh.FaceMesh(
             max_num_faces=1,
             refine_landmarks=True,
             min_detection_confidence=0.5,
@@ -98,6 +98,64 @@ class eye_tracking():
 
         return smooth_ratio_horiz, smooth_ratio_vert
 
+    def track(self):
+        ret, frame = self.camera.read()
+
+        frame = cv.flip(frame, 1)
+
+        rgb_frame = cv.cvtColor(frame, cv.COLOR_BGR2RGB)
+        results = tracking.face_mesh.process(rgb_frame)
+        img_h, img_w = frame.shape[:2]
+        if results.multi_face_landmarks:
+
+            mesh_points = np.array([np.multiply([p.x, p.y], [img_w, img_h]).astype(
+                int) for p in results.multi_face_landmarks[0].landmark])
+
+            center_left, center_right = self.locate_irises(
+                frame, mesh_points, circle_irises=True)
+
+            cv.circle(frame, mesh_points[tracking.R_RIGHT][0], 2,
+                      (255, 255, 255), 1, cv.LINE_AA)
+            cv.circle(frame, mesh_points[tracking.R_LEFT][0], 2,
+                      (0, 255, 255), 1, cv.LINE_AA)
+            cv.circle(frame, mesh_points[tracking.R_BOTTOM][0], 2,
+                      (255, 255, 255), 1, cv.LINE_AA)
+            cv.circle(frame, mesh_points[tracking.R_TOP][0], 2,
+                      (0, 255, 255), 1, cv.LINE_AA)
+
+            horiz_ratio = tracking.iris_ratio(
+                center_right, mesh_points[tracking.R_RIGHT], mesh_points[tracking.R_LEFT][0])
+            vert_ratio = tracking.iris_ratio(
+                center_right, mesh_points[tracking.R_TOP], mesh_points[tracking.R_BOTTOM][0])
+
+            self.display_ratios(frame, horiz_ratio, vert_ratio)
+
+            self.move_mouse(horiz_ratio, 0.4)
+
+            cv.imshow('img', frame)
+
+    def display_ratios(self, frame, horiz_ratio, vert_ratio):
+        cv.putText(
+            frame, f"Horizontal ratio: {horiz_ratio: 0.2f}", (30, 30), cv.FONT_HERSHEY_PLAIN, 1.2, (0, 255, 0), 1, cv.LINE_AA)
+        cv.putText(
+            frame, f"Vertical ratio: {vert_ratio: 0.2f}", (30, 90), cv.FONT_HERSHEY_PLAIN, 1.2, (0, 255, 0), 1, cv.LINE_AA)
+
+    def locate_irises(self, frame, mesh_points, circle_irises=False):
+
+        (l_cx, l_cy), l_radius = cv.minEnclosingCircle(
+            mesh_points[tracking.LEFT_IRIS])
+        (r_cx, r_cy), r_radius = cv.minEnclosingCircle(
+            mesh_points[tracking.RIGHT_IRIS])
+
+        center_left = np.array([l_cx, l_cy], dtype=np.int32)
+        center_right = np.array([r_cx, r_cy], dtype=np.int32)
+        if circle_irises:
+            cv.circle(frame, center_left, int(l_radius),
+                      (255, 0, 255), 1, cv.LINE_AA)
+            cv.circle(frame, center_right, int(r_radius),
+                      (255, 0, 255), 1, cv.LINE_AA)
+        return center_left, center_right
+
 
 def euclidean_distance(point1, point2):
     x1, y1 = point1.ravel()
@@ -107,53 +165,12 @@ def euclidean_distance(point1, point2):
 
 
 if __name__ == "__main__":
-    mp_face_mesh = mp.solutions.face_mesh
 
     mouse.FAILSAFE = False
     tracking = eye_tracking()
+
     while True:
-        ret, frame = tracking.camera.read()
-        if not ret:
-            break
-
-        frame = cv.flip(frame, 1)
-
-        rgb_frame = cv.cvtColor(frame, cv.COLOR_BGR2RGB)
-        results = tracking.face_mesh.process(rgb_frame)
-        img_h, img_w = frame.shape[:2]
-        if results.multi_face_landmarks:
-            mesh_points = np.array([np.multiply([p.x, p.y], [img_w, img_h]).astype(
-                int) for p in results.multi_face_landmarks[0].landmark])
-            (l_cx, l_cy), l_radius = cv.minEnclosingCircle(
-                mesh_points[tracking.LEFT_IRIS])
-            (r_cx, r_cy), r_radius = cv.minEnclosingCircle(
-                mesh_points[tracking.RIGHT_IRIS])
-            center_left = np.array([l_cx, l_cy], dtype=np.int32)
-            center_right = np.array([r_cx, r_cy], dtype=np.int32)
-            cv.circle(frame, center_left, int(l_radius),
-                      (255, 0, 255), 1, cv.LINE_AA)
-            cv.circle(frame, center_right, int(r_radius),
-                      (255, 0, 255), 1, cv.LINE_AA)
-            cv.circle(frame, mesh_points[tracking.R_RIGHT][0], 2,
-                      (255, 255, 255), 1, cv.LINE_AA)
-            cv.circle(frame, mesh_points[tracking.R_LEFT][0], 2,
-                      (0, 255, 255), 1, cv.LINE_AA)
-            cv.circle(frame, mesh_points[tracking.R_BOTTOM][0], 2,
-                      (255, 255, 255), 1, cv.LINE_AA)
-            cv.circle(frame, mesh_points[tracking.R_TOP][0], 2,
-                      (0, 255, 255), 1, cv.LINE_AA)
-            horiz_ratio = tracking.iris_ratio(
-                center_right, mesh_points[tracking.R_RIGHT], mesh_points[tracking.R_LEFT][0])
-            vert_ratio = tracking.iris_ratio(
-                center_right, mesh_points[tracking.R_TOP], mesh_points[tracking.R_BOTTOM][0])
-            cv.putText(
-                frame, f"Horizontal ratio: {horiz_ratio: 0.2f}", (30, 30), cv.FONT_HERSHEY_PLAIN, 1.2, (0, 255, 0), 1, cv.LINE_AA)
-            cv.putText(
-                frame, f"Vertical ratio: {vert_ratio: 0.2f}", (30, 90), cv.FONT_HERSHEY_PLAIN, 1.2, (0, 255, 0), 1, cv.LINE_AA)
-
-            tracking.move_mouse(horiz_ratio, 0.4)
-        cv.imshow('img', frame)
-
+        tracking.track()
         # Exit the loop if the 'q' key is pressed
         if cv.waitKey(1) & 0xFF == ord('q'):
             break
