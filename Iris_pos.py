@@ -114,14 +114,9 @@ class eye_tracking():
             center_left, center_right = self.locate_irises(
                 frame, mesh_points, circle_irises=True)
 
-            cv.circle(frame, mesh_points[tracking.R_RIGHT][0], 2,
-                      (255, 255, 255), 1, cv.LINE_AA)
-            cv.circle(frame, mesh_points[tracking.R_LEFT][0], 2,
-                      (0, 255, 255), 1, cv.LINE_AA)
-            cv.circle(frame, mesh_points[tracking.R_BOTTOM][0], 2,
-                      (255, 255, 255), 1, cv.LINE_AA)
-            cv.circle(frame, mesh_points[tracking.R_TOP][0], 2,
-                      (0, 255, 255), 1, cv.LINE_AA)
+            points = [mesh_points[tracking.R_RIGHT][0], mesh_points[tracking.R_LEFT]
+                      [0], mesh_points[tracking.R_BOTTOM][0], mesh_points[tracking.R_TOP][0]]
+            self.circle_points(frame, points)
 
             horiz_ratio = tracking.iris_ratio(
                 center_right, mesh_points[tracking.R_RIGHT], mesh_points[tracking.R_LEFT][0])
@@ -133,6 +128,11 @@ class eye_tracking():
             self.move_mouse(horiz_ratio, 0.4)
 
             cv.imshow('img', frame)
+
+    def circle_points(self, frame, points):
+        for point in points:
+            cv.circle(frame, point, 2,
+                      (255, 255, 255), 1, cv.LINE_AA)
 
     def display_ratios(self, frame, horiz_ratio, vert_ratio):
         cv.putText(
