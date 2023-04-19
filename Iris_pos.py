@@ -9,6 +9,7 @@ import time
 class eye_tracking():
     def __init__(self):
         self.camera = cv.VideoCapture(0)  # setting up of camera
+        self.screen_width, self.screen_height = mouse.size()
 
         self.face_mesh = mp.solutions.face_mesh.FaceMesh(
             max_num_faces=1,
@@ -17,7 +18,16 @@ class eye_tracking():
             min_tracking_confidence=0.5
         )  # face mesh used for eye and iris detection
 
+        self.calibrating = False
         self.CALIBRATION_STEPS = 30  # amount of data collected for calibration
+        self.calibration_state = "left"
+        self.calibrated = False
+        self.calibration_horiz = []
+        self.calibration_vert = []
+        self.cal_point_left = 0
+        self.cal_point_right = 0
+        self.cal_point_top = 0
+        self.cal_point_bottom = 0
 
         self.vert_slope = -0.15
         self.vert_intercept = 3.33
@@ -32,7 +42,6 @@ class eye_tracking():
         self.H_ITER_MAX = 10
         self.h_iter = 0
         self.horizontal_ratios = np.zeros(self.H_ITER_MAX)
-        self.screen_width, self.screen_height = mouse.size()
 
         self.LEFT_EYE = [362, 382, 381, 380, 374, 373, 390,
                          249, 263, 466, 388, 387, 386, 385, 384, 398]
@@ -60,19 +69,57 @@ class eye_tracking():
 
         horiz_ratio, vert_ratio = self.smoothen(horiz_ratio, vert_ratio)
 
-        mouse.moveTo(-self.screen_width/self.horiz_slope * horiz_ratio +
-                     self.screen_width * self.horiz_intercept, -self.screen_height/self.vert_slope * vert_ratio -
-                     self.screen_height * self.vert_intercept)
+        mouse.moveTo(self.screen_width*(1/self.horiz_slope * horiz_ratio - self.horiz_intercept)
+                     #  self.screen_height/2
+                     #  self.screen_height*(1/self.vert_slope * vert_ratio - self.vert_intercept)
+                     )
+
+    def compute_equations(self):
+        print("left ratio: ", self.cal_point_left)
+        print("right ratio: ", self.cal_point_right)
+        print("top ratio: ", self.cal_point_top)
+        print("bottom ratio: ", self.cal_point_bottom)
+        self.vert_slope = self.cal_point_bottom - self.cal_point_top
+        self.horiz_slope = self.cal_point_right - self.cal_point_left
+
+        self.vert_intercept = self.cal_point_top/self.vert_slope
+        self.horiz_intercept = self.cal_point_left/self.horiz_slope
 
     def calibrate(self, horiz_ratio, vert_ratio):
-        if calibrate_horiz:
-            temp_horiz_ratios.append(horiz_ratio)
-            if len(temp_horiz_ratios) == CALIBRATION_STEPS:
-                if calibrate_horiz_left:
-                    left_ratio = sum(temp_horiz_ratios)/len(temp_horiz_ratios)
+        state = self.calibration_state
+        if state == "done":
+            self.compute_equations()
+            self.calibrated = True
+            return
+        if state == "left" or state == "right":
+            self.calibration_horiz.append(horiz_ratio)
+            if len(self.calibration_horiz) >= self.CALIBRATION_STEPS:
+                if state == "left":
+                    self.cal_point_left = np.mean(self.calibration_horiz)
                 else:
-                    right_ratio = sum(temp_horiz_ratios)/len(temp_horiz_ratios)
-                    horiz_slope = left_ratio - right_ratio
+                    self.cal_point_right = np.mean(self.calibration_horiz)
+                self.calibration_horiz.clear()
+                self.switch_calibration_state()
+        elif state == "top" or state == "bottom":
+            self.calibration_vert.append(vert_ratio)
+            if len(self.calibration_vert) >= self.CALIBRATION_STEPS:
+                if state == "top":
+                    self.cal_point_top = np.mean(self.calibration_vert)
+                else:
+                    self.cal_point_bottom = np.mean(self.calibration_vert)
+                self.calibration_horiz.clear()
+                self.switch_calibration_state()
+
+    def switch_calibration_state(self):
+        self.calibrating = False
+        if self.calibration_state == "left":
+            self.calibration_state = "right"
+        elif self.calibration_state == "right":
+            self.calibration_state = "top"
+        elif self.calibration_state == "top":
+            self.calibration_state = "bottom"
+        elif self.calibration_state == "bottom":
+            self.calibration_state = "done"
 
     def smoothen(self, horiz_ratio, vert_ratio):
 
@@ -99,12 +146,13 @@ class eye_tracking():
         return smooth_ratio_horiz, smooth_ratio_vert
 
     def track(self):
+
         ret, frame = self.camera.read()
 
         frame = cv.flip(frame, 1)
 
         rgb_frame = cv.cvtColor(frame, cv.COLOR_BGR2RGB)
-        results = tracking.face_mesh.process(rgb_frame)
+        results = self.face_mesh.process(rgb_frame)
         img_h, img_w = frame.shape[:2]
         if results.multi_face_landmarks:
 
@@ -124,8 +172,20 @@ class eye_tracking():
                 center_right, mesh_points[tracking.R_TOP], mesh_points[tracking.R_BOTTOM][0])
 
             self.display_ratios(frame, horiz_ratio, vert_ratio)
-
-            self.move_mouse(horiz_ratio, 0.4)
+            if (not self.calibrated):
+                if not self.calibrating:
+                    cv.putText(frame, "Please look at the " +
+                               self.calibration_state + " of the sreen then press c key", (30, 120), cv.FONT_HERSHEY_PLAIN, 1.2, (0, 255, 0), 1, cv.LINE_AA)
+                    if cv.waitKey(1) & 0xFF == ord('c'):
+                        print("calibrating")
+                        self.calibrating = True
+                else:
+                    cv.putText(frame, "calibrating", (120, 30),
+                               cv.FONT_HERSHEY_PLAIN, 1.2, (0, 255, 0), 1, cv.LINE_AA)
+                if self.calibrating:
+                    self.calibrate(horiz_ratio, vert_ratio)
+            else:
+                self.move_mouse(horiz_ratio, vert_ratio)
 
             cv.imshow('img', frame)
 
