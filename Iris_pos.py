@@ -91,9 +91,6 @@ class eye_tracking():
 
     def calibrate(self, horiz_ratio, vert_ratio):
         state = self.calibration_state
-        if state == "done":
-            self.compute_equations()
-            self.calibrated = True
 
         if state == "left" or state == "right":
             self.calibration_horiz.append(horiz_ratio)
@@ -123,7 +120,9 @@ class eye_tracking():
         elif self.calibration_state == "top":
             self.calibration_state = "bottom"
         elif self.calibration_state == "bottom":
-            self.calibration_state = "done"
+            self.compute_equations()
+            self.calibrated = True
+            self.calibration_state = "left"
 
     def smoothen(self, horiz_ratio, vert_ratio):
 
