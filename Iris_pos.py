@@ -10,7 +10,7 @@ class eye_tracking():
     def __init__(self):
         self.camera = cv.VideoCapture(0)  # setting up of camera
         self.screen_width, self.screen_height = mouse.size()
-
+        self.MOUSESPEED = 20
         self.face_mesh = mp.solutions.face_mesh.FaceMesh(
             max_num_faces=1,
             refine_landmarks=True,
@@ -35,11 +35,11 @@ class eye_tracking():
         self.horiz_slope = 0.16
         self.horiz_intercept = 3.19
 
-        self.V_ITER_MAX = 10
+        self.V_ITER_MAX = 20
         self.v_iter = 0
         self.vertical_ratios = np.zeros(self.V_ITER_MAX)
 
-        self.H_ITER_MAX = 10
+        self.H_ITER_MAX = 20
         self.h_iter = 0
         self.horizontal_ratios = np.zeros(self.H_ITER_MAX)
 
@@ -55,8 +55,8 @@ class eye_tracking():
         self.L_RIGHT = [133]
 
         self.R_LEFT = [362]  # right eye left point
-        self.R_TOP = [257]  # right eye top point
-        self.R_BOTTOM = [253]  # right eye bottom point
+        self.R_TOP = [443]  # right eye top point
+        self.R_BOTTOM = [450]  # right eye bottom point
         self.R_RIGHT = [263]  # right eye right point
 
     def iris_ratio(self, iris_center, point1, point2):
@@ -69,10 +69,14 @@ class eye_tracking():
 
         horiz_ratio, vert_ratio = self.smoothen(horiz_ratio, vert_ratio)
 
-        mouse.moveTo(self.screen_width*(1/self.horiz_slope * horiz_ratio - self.horiz_intercept)
+        mouse.moveTo(self.screen_width*(1/self.horiz_slope * horiz_ratio - self.horiz_intercept), mouse.position().y
                      #  self.screen_height/2
                      #  self.screen_height*(1/self.vert_slope * vert_ratio - self.vert_intercept)
                      )
+        if vert_ratio <= 0.35:
+            mouse.move(0, self.MOUSESPEED)
+        elif vert_ratio >= 0.65:
+            mouse.move(0, -self.MOUSESPEED)
 
     def compute_equations(self):
         print("left ratio: ", self.cal_point_left)
@@ -87,10 +91,7 @@ class eye_tracking():
 
     def calibrate(self, horiz_ratio, vert_ratio):
         state = self.calibration_state
-        if state == "done":
-            self.compute_equations()
-            self.calibrated = True
-            return
+
         if state == "left" or state == "right":
             self.calibration_horiz.append(horiz_ratio)
             if len(self.calibration_horiz) >= self.CALIBRATION_STEPS:
@@ -119,7 +120,9 @@ class eye_tracking():
         elif self.calibration_state == "top":
             self.calibration_state = "bottom"
         elif self.calibration_state == "bottom":
-            self.calibration_state = "done"
+            self.compute_equations()
+            self.calibrated = True
+            self.calibration_state = "left"
 
     def smoothen(self, horiz_ratio, vert_ratio):
 
@@ -172,7 +175,7 @@ class eye_tracking():
                 center_right, mesh_points[tracking.R_TOP], mesh_points[tracking.R_BOTTOM][0])
 
             self.display_ratios(frame, horiz_ratio, vert_ratio)
-            if (not self.calibrated):
+            if not self.calibrated:
                 if not self.calibrating:
                     cv.putText(frame, "Please look at the " +
                                self.calibration_state + " of the sreen then press c key", (30, 120), cv.FONT_HERSHEY_PLAIN, 1.2, (0, 255, 0), 1, cv.LINE_AA)
@@ -180,7 +183,7 @@ class eye_tracking():
                         print("calibrating")
                         self.calibrating = True
                 else:
-                    cv.putText(frame, "calibrating", (120, 30),
+                    cv.putText(frame, "calibrating", (30, 120),
                                cv.FONT_HERSHEY_PLAIN, 1.2, (0, 255, 0), 1, cv.LINE_AA)
                 if self.calibrating:
                     self.calibrate(horiz_ratio, vert_ratio)
