@@ -51,6 +51,12 @@ class eye_tracking():
         self.RIGHT_IRIS = [474, 475, 476, 477]
         self.LEFT_IRIS = [469, 470, 471, 472]
 
+        self.L_TOP_EYE_LID = [159]
+        self.L_BOTTOM_EYE_LID = [145]
+
+        self.R_TOP_EYE_LID = [386]
+        self.R_BOTTOM_EYE_LID = [374]
+
         self.L_LEFT = [33]
         self.L_RIGHT = [133]
 
@@ -58,6 +64,9 @@ class eye_tracking():
         self.R_TOP = [443]  # right eye top point
         self.R_BOTTOM = [450]  # right eye bottom point
         self.R_RIGHT = [263]  # right eye right point
+
+        self.left_clicked = False
+        self.right_clicked = False
 
     def iris_ratio(self, iris_center, point1, point2):
         center_to_point1_dist = euclidean_distance(iris_center, point1)
@@ -165,14 +174,16 @@ class eye_tracking():
             center_left, center_right = self.locate_irises(
                 frame, mesh_points, circle_irises=True)
 
-            points = [mesh_points[tracking.R_RIGHT][0], mesh_points[tracking.R_LEFT]
-                      [0], mesh_points[tracking.R_BOTTOM][0], mesh_points[tracking.R_TOP][0]]
+            points = [mesh_points[self.R_RIGHT][0], mesh_points[self.R_LEFT]
+                      [0], mesh_points[self.R_BOTTOM][0], mesh_points[self.R_TOP][0],
+                      mesh_points[self.L_TOP_EYE_LID][0], mesh_points[self.L_BOTTOM_EYE_LID][0],
+                      mesh_points[self.R_TOP_EYE_LID][0], mesh_points[self.R_BOTTOM_EYE_LID][0]]
             self.circle_points(frame, points)
 
-            horiz_ratio = tracking.iris_ratio(
-                center_right, mesh_points[tracking.R_RIGHT], mesh_points[tracking.R_LEFT][0])
-            vert_ratio = tracking.iris_ratio(
-                center_right, mesh_points[tracking.R_TOP], mesh_points[tracking.R_BOTTOM][0])
+            horiz_ratio = self.iris_ratio(
+                center_right, mesh_points[self.R_RIGHT], mesh_points[self.R_LEFT][0])
+            vert_ratio = self.iris_ratio(
+                center_right, mesh_points[self.R_TOP], mesh_points[self.R_BOTTOM][0])
 
             self.display_ratios(frame, horiz_ratio, vert_ratio)
             if not self.calibrated:
@@ -188,9 +199,31 @@ class eye_tracking():
                 if self.calibrating:
                     self.calibrate(horiz_ratio, vert_ratio)
             else:
+                self.click(frame, mesh_points)
                 self.move_mouse(horiz_ratio, vert_ratio)
 
             cv.imshow('img', frame)
+
+    def click(self, frame, points):
+        dist_left = euclidean_distance(
+            points[self.L_TOP_EYE_LID][0], points[self.L_BOTTOM_EYE_LID][0])
+        dist_right = euclidean_distance(
+            points[self.R_TOP_EYE_LID][0], points[self.R_BOTTOM_EYE_LID][0])
+        if (dist_left < 2.3 and not self.left_clicked and dist_right > 3):
+            mouse.leftClick()
+            self.left_clicked = True
+        if (dist_right < 2.3 and not self.right_clicked and dist_left > 3):
+            mouse.rightClick()
+            self.right_clicked = True
+        if (dist_left > 3):
+            self.left_clicked = False
+        if (dist_right > 3):
+            self.right_clicked = False
+
+        cv.putText(frame, "distance bewteen left eye lids: " + str(dist_left),
+                   (30, 150), cv.FONT_HERSHEY_PLAIN, 1.2, (0, 255, 0), 1, cv.LINE_AA)
+        cv.putText(frame, "distance bewteen right eye lids: " + str(dist_right),
+                   (30, 180), cv.FONT_HERSHEY_PLAIN, 1.2, (0, 255, 0), 1, cv.LINE_AA)
 
     def circle_points(self, frame, points):
         for point in points:
