@@ -61,9 +61,12 @@ class eye_tracking():
         self.L_RIGHT = [133]
 
         self.R_LEFT = [362]  # right eye left point
-        self.R_TOP = [443]  # right eye top point
+        self.R_TOP = [295]  # right eye top point
         self.R_BOTTOM = [450]  # right eye bottom point
         self.R_RIGHT = [263]  # right eye right point
+
+        self.R_TOP_EYEBROW = [295]
+        self.R_BOTTOM_EYEBROW = [257]
 
         self.left_clicked = False
         self.right_clicked = False
@@ -177,7 +180,8 @@ class eye_tracking():
             points = [mesh_points[self.R_RIGHT][0], mesh_points[self.R_LEFT]
                       [0], mesh_points[self.R_BOTTOM][0], mesh_points[self.R_TOP][0],
                       mesh_points[self.L_TOP_EYE_LID][0], mesh_points[self.L_BOTTOM_EYE_LID][0],
-                      mesh_points[self.R_TOP_EYE_LID][0], mesh_points[self.R_BOTTOM_EYE_LID][0]]
+                      mesh_points[self.R_TOP_EYE_LID][0], mesh_points[self.R_BOTTOM_EYE_LID][0],
+                      mesh_points[self.R_TOP_EYEBROW][0]]
             self.circle_points(frame, points)
 
             horiz_ratio = self.iris_ratio(
@@ -200,6 +204,10 @@ class eye_tracking():
                     self.calibrate(horiz_ratio, vert_ratio)
             else:
                 self.click(frame, mesh_points)
+                if cv.waitKey(1) & 0xFF == ord('d'):
+                    self.horiz_intercept *= 1.01
+                elif cv.waitKey(1) & 0xFF == ord('a'):
+                    self.horiz_intercept *= 0.99
                 self.move_mouse(horiz_ratio, vert_ratio)
 
             cv.imshow('img', frame)
