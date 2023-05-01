@@ -79,15 +79,15 @@ class eye_tracking():
 
     def move_mouse(self, horiz_ratio, vert_ratio):
 
-        horiz_ratio, vert_ratio = self.smoothen(horiz_ratio, vert_ratio)
+        horiz_ratio, _ = self.smoothen(horiz_ratio, vert_ratio)
 
         mouse.moveTo(self.screen_width*(1/self.horiz_slope * horiz_ratio - self.horiz_intercept), mouse.position().y
                      #  self.screen_height/2
                      #  self.screen_height*(1/self.vert_slope * vert_ratio - self.vert_intercept)
                      )
-        if vert_ratio <= 0.35:
+        if vert_ratio <= 0.40:
             mouse.move(0, self.MOUSESPEED)
-        elif vert_ratio >= 0.65:
+        elif vert_ratio >= 0.60:
             mouse.move(0, -self.MOUSESPEED)
 
     def compute_equations(self):
@@ -217,10 +217,10 @@ class eye_tracking():
             points[self.L_TOP_EYE_LID][0], points[self.L_BOTTOM_EYE_LID][0])
         dist_right = euclidean_distance(
             points[self.R_TOP_EYE_LID][0], points[self.R_BOTTOM_EYE_LID][0])
-        if (dist_left < 2.3 and not self.left_clicked and dist_right > 3):
+        if (dist_left < 4 and not self.left_clicked and dist_right > 6):
             mouse.leftClick()
             self.left_clicked = True
-        if (dist_right < 2.3 and not self.right_clicked and dist_left > 3):
+        if (dist_right < 4 and not self.right_clicked and dist_left > 6):
             mouse.rightClick()
             self.right_clicked = True
         if (dist_left > 3):
